@@ -38,7 +38,12 @@ The first API contract should expose:
 - `GET /v1/workers/{id}/telemetry?window=1h`: downsampled time series for the chart
 - `GET /v1/profitability`: pool-reported yield plus electricity cost and fee assumptions
 
-Commands should be authorized server-side, logged, rate-limited, and rejected when the worker is stale or over its configured temperature limit. The Android client is not a security boundary.
+The first Firebase gateway implementation lives in `Assets/Scripts/CloudFunctions/validateReceipt/workerGateway.ts`.
+It authenticates Firebase ID tokens, reads user-owned worker documents, queues commands, applies a
+temperature/offline guard, and rejects reused idempotency keys. A separate worker agent still needs
+to consume `users/{uid}/workerCommands` and report telemetry back to Firestore.
+
+Commands should be authorized server-side, logged, rate-limited, and rejected when the worker is stale or over its configured temperature limit. The gateway must persist and enforce each client-provided idempotency key so retries cannot execute a command twice. The Android client is not a security boundary.
 
 ## Performance strategy
 
@@ -52,6 +57,7 @@ Commands should be authorized server-side, logged, rate-limited, and rejected wh
 ## Security and abuse controls
 
 - Use OAuth/OIDC or passkeys for account authentication.
+- The current prototype accepts an access token to exercise the gateway contract; replace this with OAuth/OIDC or passkeys before external release.
 - Bind commands to a device session and require re-authentication for sensitive actions.
 - Store only opaque access tokens, never wallet secrets.
 - Use TLS certificate validation and server-side authorization per worker.

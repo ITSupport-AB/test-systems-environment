@@ -16,6 +16,14 @@ The worker values are currently local demo state. The next integration replaces 
 
 Open `MiningCompanion` in Android Studio and use JDK 17 with Android SDK 35. The project expects the Android Gradle Plugin and Kotlin plugins to be downloaded from Google Maven and Maven Central.
 
+Set the real API endpoint through a non-committed Gradle property when building:
+
+```text
+./gradlew :app:assembleRelease -PapiBaseUrl=https://api.example.com
+```
+
+Configure release signing in CI or Android Studio; signing keys must never be committed.
+
 ```text
 ./gradlew :app:assembleDebug
 ```
