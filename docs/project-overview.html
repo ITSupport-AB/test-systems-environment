@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freebuff Desktop — Unity GaaS Architecture</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1d2639; --border: #2a3550;
+    --text: #dbe4f5; --muted: #8fa0c0; --accent: #58b6ff; --ok: #3ddc97;
+    --warn: #ffcf5c; --red: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.55 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 22px 28px 16px; border-bottom: 1px solid var(--border);
+           background: linear-gradient(180deg, #16203a, #0f1420); }
+  h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .3px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.2px;
+       color: var(--accent); margin: 0 0 12px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  main { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { background: var(--panel2); border: 1px solid var(--border);
+          border-radius: 999px; padding: 4px 12px; font-size: 12px;
+          color: var(--muted); }
+  .chip b { color: var(--text); font-weight: 600; }
+  .chip.ok { border-color: #2c8a63; color: var(--ok); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 14px; margin-bottom: 26px; }
+  .card { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0 0 8px; color: var(--muted); font-size: 12.5px; }
+  .files { font-size: 11.5px; color: var(--accent); font-family: Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px;
+          background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td.num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  pre { background: #0b1018; border: 1px solid var(--border); border-radius: 8px;
+        padding: 14px; overflow: auto; font: 12px/1.5 Consolas, monospace;
+        color: #b9e6ff; margin: 0; }
+  .fsm { display: flex; align-items: center; justify-content: center;
+         flex-wrap: wrap; gap: 10px; padding: 20px; }
+  .state { background: var(--panel2); border: 1px solid var(--accent);
+           border-radius: 8px; padding: 10px 18px; font-weight: 600; }
+  .arrow { color: var(--muted); font-size: 18px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  code, .mono { font-family: Consolas, monospace; }
+
+  /* Leaderboard demo */
+  #lbd .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  #lbd input[type=text], #lbd input[type=number] {
+    background: #0b1018; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; font-size: 13px; width: 150px; }
+  #lbd .toggles { display: flex; gap: 16px; flex-wrap: wrap; margin: 2px 0 12px; font-size: 12px; color: var(--muted); }
+  #lbd .toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  #lbd button {
+    background: var(--accent); color: #07121f; border: none; border-radius: 6px;
+    padding: 8px 16px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  #lbd button.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  #lbd button:hover { filter: brightness(1.12); }
+  #lbd .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 820px) { #lbd .cols { grid-template-columns: 1fr; } }
+  #lbd .log { background: #0b1018; border: 1px solid var(--border); border-radius: 8px;
+              padding: 10px 12px; font: 12px/1.6 Consolas, monospace; height: 240px; overflow: auto; }
+  #lbd .log .t { color: var(--muted); }
+  #lbd .log .acc { color: var(--ok); }
+  #lbd .log .rej { color: var(--red); }
+  #lbd .log .warn { color: var(--warn); }
+  #lbd table { margin-top: 8px; }
+  #lbd tr.mine td { background: rgba(61, 220, 151, .09); font-weight: 700; }
+  #lbd .ruling { font-size: 12px; color: var(--muted); border-left: 3px solid var(--accent);
+                 padding: 8px 12px; background: var(--panel2); border-radius: 0 6px 6px 0; }
+
+  /* Gameplay FSM demo */
+  #fsm .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  #fsm button { background: var(--accent); color: #07121f; border: none; border-radius: 6px;
+                padding: 8px 16px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  #fsm button.danger { background: var(--red); }
+  #fsm button:disabled { opacity: .4; cursor: not-allowed; }
+  #fsm .toggles { display: flex; gap: 16px; flex-wrap: wrap; margin: 2px 0 12px; font-size: 12px; color: var(--muted); }
+  #fsm .toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  #fsm select { background: #0b1018; color: var(--text); border: 1px solid var(--border);
+                border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+  #fsm .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 10px; margin-bottom: 14px; }
+  #fsm .stat { background: #0b1018; border: 1px solid var(--border); border-radius: 8px;
+               padding: 8px 12px; }
+  #fsm .stat b { display: block; font-size: 20px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  #fsm .stat small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+  #fsm .pill { display: inline-block; border-radius: 999px; padding: 3px 12px; font-weight: 700;
+               font-size: 12px; border: 1px solid var(--border); }
+  #fsm .pill.spawn { background: rgba(88,182,255,.15); color: var(--accent); border-color: var(--accent); }
+  #fsm .pill.wave { background: rgba(61,220,151,.12); color: var(--ok); border-color: #2c8a63; }
+  #fsm .pill.over { background: rgba(255,107,107,.14); color: var(--red); border-color: var(--red); }
+  #fsm .hptrack { margin: 8px 0 14px; }
+  #fsm .hpbar { background: #0b1018; border: 1px solid var(--border); border-radius: 999px;
+                height: 12px; overflow: hidden; }
+  #fsm .hpfill { height: 100%; width: 100%; background: linear-gradient(90deg, #3ddc97, #58b6ff);
+                 transition: width .2s; }
+  #fsm .log { background: #0b1018; border: 1px solid var(--border); border-radius: 8px;
+              padding: 10px 12px; font: 12px/1.6 Consolas, monospace; height: 220px; overflow: auto; }
+  #fsm .log .t { color: var(--muted); }
+  #fsm .log .tr { color: var(--accent); }
+  #fsm .log .clr { color: var(--ok); }
+  #fsm .log .ko { color: var(--red); }
+  #fsm .arena { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  #fsm .enemy { width: 18px; height: 18px; border-radius: 4px; background: #7a3550;
+                border: 1px solid #c0507c; display: inline-block; }
+  #fsm .cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+  @media (max-width: 820px) { #fsm .cols { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Freebuff Desktop — Unity GaaS Architecture</h1>
+  <div class="sub">Cross-platform (iOS / Android / PC / WebGL) games-as-a-service foundation
+    &nbsp;•&nbsp; C# + Firebase + Cloud Functions &nbsp;•&nbsp; Unity 2022.3 LTS</div>
+  <div class="chips">
+    <span class="chip">branch <b>main</b> @ <b>4ddd5f5</b></span>
+    <span class="chip">origin <b>github.com/Louis2709/test-systems-environment</b></span>
+    <span class="chip ok">CI — Headless tests <b>41/41</b> PASS</span>
+    <span class="chip ok">CI — Unity compile check <b>GREEN</b> (skipped cleanly until license + project guards are met)</span>
+    <span class="chip">PRs <b>#1</b> &amp; <b>#2</b> merged</span>
+  </div>
+</header>
+<main>
+
+  <section style="margin-bottom:26px">
+    <h2>Recent commits</h2>
+    <table>
+      <tr><th>Commit</th><th>Message</th></tr>
+      <tr><td class="mono">4ddd5f5</td><td>Add CI workflow: headless Perl tests and Unity compile check (#2, merged)</td></tr>
+      <tr><td class="mono">ead77f0</td><td>Add GaaS architecture: receipt validation, gameplay FSM, Remote Config, cloud save, and leaderboard (#1, merged)</td></tr>
+    </table>
+  </section>
+
+  <h2>Systems</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Core Managers</h3>
+      <p>Boot sequence: RemoteConfig → Auth → Subscription restore → Save load → Main menu. Singletons with null-safe wiring and top-level error handling.</p>
+      <div class="files">Core/GameManager.cs • AuthManager.cs • SubscriptionManager.cs • PlayerController.cs • UIManager.cs</div>
+    </div>
+    <div class="card">
+      <h3>Gameplay State Machine</h3>
+      <p>Generic typed FSM (Enter / Exit / Tick / FixedTick) driving Spawn → Wave → GameOver with re-entrant-safe transitions and 28 EditMode NUnit tests.</p>
+      <div class="files">Gameplay/GameplayStateMachine.cs • SpawnState.cs • WaveState.cs • GameOverState.cs • GameplayContext.cs • GameplayRunner.cs • IGameState.cs</div>
+    </div>
+    <div class="card">
+      <h3>LiveOps — Remote Config</h3>
+      <p>Firebase Remote Config singleton with typed getters, designer-editable JSON defaults, and config-updated events. Change price points &amp; seasonal events without shipping an app update.</p>
+      <div class="files">LiveOps/RemoteConfigManager.cs • Resources/RemoteConfigDefaults.json</div>
+    </div>
+    <div class="card">
+      <h3>Cloud-Synced Saves</h3>
+      <p>Debounced Firestore sync (5 s coalescing), immediate flush on pause/quit, local JSON fallback, monotonic version counter for conflict detection.</p>
+      <div class="files">Save/SaveManager.cs • Data/PlayerData.cs</div>
+    </div>
+    <div class="card">
+      <h3>Monetization — Receipt Validation</h3>
+      <p>Client bridges Unity IAP to a Firebase Cloud Function that validates Apple / Google / Stripe receipts with SHA-256 anti-replay nonces and writes VIP state server-side.</p>
+      <div class="files">Backend/ReceiptValidator.cs • CloudFunctions/validateReceipt/index.ts</div>
+    </div>
+    <div class="card">
+      <h3>Leaderboard (anti-inflation)</h3>
+      <p>Monotonic score enforcement in Firestore rules (new ≥ old, no deletes, owner-only) mirrored client-side with optimistic updates, rollback, and rank queries.</p>
+      <div class="files">Leaderboard/LeaderboardManager.cs • CloudFunctions/firestore.rules</div>
+    </div>
+    <div class="card">
+      <h3>CI / Editor tooling</h3>
+      <p>GitHub Actions: headless Perl suite (41 asserts) + Unity compile check gated on license/project guards; batchmode compile method for unity-builder.</p>
+      <div class="files">.github/workflows/ci.yml • Editor/CompileCheck.cs • Tests/Editor/*</div>
+    </div>
+  </div>
+
+  <h2>Gameplay loop</h2>
+  <div class="card">
+    <div class="fsm">
+      <div class="state">SpawnState</div><span class="arrow">→</span>
+      <div class="state">WaveState <span style="color:var(--muted);font-weight:400">(self-loops per wave)</span></div>
+      <span class="arrow">→ on player death</span>
+      <div class="state">GameOverState</div>
+      <span class="arrow">→ restart</span>
+      <div class="state">SpawnState</div>
+    </div>
+    <div class="note">Wave scaling: enemy count = 5 + wave × 2 (capped at configurable max). EnemiesAlive resets on Enter; cached predicate avoids per-frame GC.</div>
+  </div>
+
+  <h2 style="margin-top:26px">Tracked files (28)</h2>
+  <table>
+    <tr><th>Path</th><th style="text-align:right">Lines</th><th>Path</th><th style="text-align:right">Lines</th></tr>
+    <tr><td class="mono">.gitattributes</td><td class="num">2</td><td class="mono">.gitignore</td><td class="num">92</td></tr>
+    <tr><td class="mono">.github/workflows/ci.yml</td><td class="num">89</td><td class="mono">Assets/Editor/CompileCheck.cs</td><td class="num">37</td></tr>
+    <tr><td class="mono">Assets/Resources/RemoteConfigDefaults.json</td><td class="num">17</td><td class="mono">Assets/Scripts/Backend/ReceiptValidator.cs</td><td class="num">133</td></tr>
+    <tr><td class="mono">Assets/Scripts/CloudFunctions/firebase.json</td><td class="num">19</td><td class="mono">Assets/Scripts/CloudFunctions/firestore.rules</td><td class="num">117</td></tr>
+    <tr><td class="mono">Assets/Scripts/CloudFunctions/validateReceipt/index.ts</td><td class="num">390</td><td class="mono">Assets/Scripts/CloudFunctions/validateReceipt/package.json</td><td class="num">24</td></tr>
+    <tr><td class="mono">Assets/Scripts/Core/AuthManager.cs</td><td class="num">114</td><td class="mono">Assets/Scripts/Core/GameManager.cs</td><td class="num">115</td></tr>
+    <tr><td class="mono">Assets/Scripts/Core/PlayerController.cs</td><td class="num">130</td><td class="mono">Assets/Scripts/Core/SubscriptionManager.cs</td><td class="num">116</td></tr>
+    <tr><td class="mono">Assets/Scripts/Core/UIManager.cs</td><td class="num">131</td><td class="mono">Assets/Scripts/Data/PlayerData.cs</td><td class="num">142</td></tr>
+    <tr><td class="mono">Assets/Scripts/Gameplay/GameOverState.cs</td><td class="num">76</td><td class="mono">Assets/Scripts/Gameplay/GameplayContext.cs</td><td class="num">51</td></tr>
+    <tr><td class="mono">Assets/Scripts/Gameplay/GameplayRunner.cs</td><td class="num">121</td><td class="mono">Assets/Scripts/Gameplay/GameplayStateMachine.cs</td><td class="num">118</td></tr>
+    <tr><td class="mono">Assets/Scripts/Gameplay/IGameState.cs</td><td class="num">29</td><td class="mono">Assets/Scripts/Gameplay/SpawnState.cs</td><td class="num">67</td></tr>
+    <tr><td class="mono">Assets/Scripts/Gameplay/WaveState.cs</td><td class="num">155</td><td class="mono">Assets/Scripts/Leaderboard/LeaderboardManager.cs</td><td class="num">554</td></tr>
+    <tr><td class="mono">Assets/Scripts/LiveOps/RemoteConfigManager.cs</td><td class="num">182</td><td class="mono">Assets/Scripts/Save/SaveManager.cs</td><td class="num">291</td></tr>
+    <tr><td class="mono">Assets/Tests/Editor/GameplayStateMachineTests.cs</td><td class="num">518</td><td class="mono">Assets/Tests/Editor/test_leaderboard_headless.pl</td><td class="num">310</td></tr>
+  </table>
+
+  <h2 style="margin-top:26px">Remote Config defaults (designer-editable)</h2>
+  <pre>{
+  "subscription_price_usd": 4.99,
+  "battlepass_price_usd": 9.99,
+  "ad_frequency_seconds": 30,
+  "battlepass_xp_multiplier": 1.0,
+  "vip_xp_multiplier": 1.5,
+  "xp_per_wave_base": 100,
+  "seasonal_event_enabled": false,
+  "seasonal_event_duration_hours": 72,
+  "seasonal_event_id": "none",
+  "seasonal_event_reward_id": "none",
+  "enemy_spawn_rate_base": 2.0,
+  "enemy_health_multiplier": 1.0,
+  "max_enemies_per_wave": 20,
+  "feature_new_ui_enabled": false,
+  "feature_battle_royale_enabled": false
+}</pre>
+
+  <h2 style="margin-top:26px">Firestore security rules (anti-inflation + ownership)</h2>
+  <pre>rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function getUserUid() { return request.auth.uid; }
+    function getDocUid() { return resource.id; }
+    function isOwner() { return getUserUid() == getDocUid(); }
+    function isFromAdmin() { return request.auth.token.admin == true; }
+
+    // --- Users: owner-only, VIP fields server-writable only ---
+    match /users/{userId} {
+      allow read: if isOwner();
+      allow create: if isOwner()
+        &amp;&amp; request.resource.data.keys().hasAll(['createdAt'])
+        &amp;&amp; !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isVIP', 'vipExpiry', 'vipProductId', 'vipPlatform']);
+      allow update: if isOwner()
+        &amp;&amp; !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isVIP', 'vipExpiry', 'vipProductId', 'vipPlatform',
+                   'vipUpdatedAt', 'vipEnvironment', 'vipExpiredAt']);
+      allow delete: if false;
+
+      match /data/{docId} { allow read: if isOwner(); allow write: if isOwner(); }
+      match /receiptNonces/{nonceId} { allow read: if isOwner(); allow create, update, delete: if false; }
+    }
+
+    // --- Leaderboard: monotonic scores, no deletes ---
+    match /leaderboard/{seasonId}/entries/{playerId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth.uid == playerId
+        &amp;&amp; request.resource.data.keys().hasAll(['playerName', 'score', 'uid', 'submittedAt'])
+        &amp;&amp; request.resource.data.score is int
+        &amp;&amp; request.resource.data.score &gt; 0
+        &amp;&amp; request.resource.data.uid == request.auth.uid
+        &amp;&amp; request.resource.data.playerName is string
+        &amp;&amp; request.resource.data.playerName.size() &gt; 0
+        &amp;&amp; request.resource.data.playerName.size() &lt;= 24;
+      allow update: if request.auth.uid == playerId
+        &amp;&amp; request.resource.data.score &gt;= resource.data.score
+        &amp;&amp; request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['score', 'playerName', 'submittedAt', 'highWave', 'metadata'])
+        &amp;&amp; request.resource.data.playerName is string
+        &amp;&amp; request.resource.data.playerName.size() &gt; 0
+        &amp;&amp; request.resource.data.playerName.size() &lt;= 24;
+      allow delete: if false;
+    }
+
+    // --- Global deny-all catch-all ---
+    match /{document=**} { allow read, write: if false; }
+  }
+}</pre>
+
+  <h2 id="lbd-anchor" style="margin-top:30px">Interactive demo — anti-inflation leaderboard</h2>
+  <div class="card" id="lbd">
+    <p>Simulation of the enforcement rules mirrored from <span class="mono">LeaderboardManager.cs</span> (client guard,
+    optimistic update, rollback) and <span class="mono">firestore.rules</span> (server monotonic rule).
+    Try: submit a score, then a <b>lower</b> one — watch the client guard reject it. Tick
+    <b>bypass client guard</b> to impersonate a hacked client and see the <i>server</i> reject it instead.</p>
+
+    <div class="controls">
+      <input type="text" id="lbd-name" value="You" placeholder="Player name" maxlength="24">
+      <input type="number" id="lbd-score" value="2500" min="1" step="1" placeholder="Score">
+      <button id="lbd-submit">Submit score</button>
+      <button id="lbd-reset" class="ghost">Reset demo</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="lbd-auth" checked> signed in</label>
+      <label><input type="checkbox" id="lbd-outage"> simulate server outage (optimistic rollback)</label>
+      <label><input type="checkbox" id="lbd-bypass"> bypass client guard (rogue client)</label>
+    </div>
+
+    <div class="cols">
+      <div>
+        <h3 style="margin:0 0 4px">Result log</h3>
+        <div class="log" id="lbd-log"></div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 4px">Leaderboard — season 1 <span style="color:var(--muted);font-weight:400">(top 10, yours highlighted)</span></h3>
+        <table>
+          <tr><th>#</th><th>Player</th><th style="text-align:right">Score</th><th style="text-align:right">Rules check</th></tr>
+          <tbody id="lbd-board"></tbody>
+        </table>
+        <p class="ruling" style="margin-top:10px">
+          Server rules enforced (from <span class="mono">firestore.rules</span>):
+          <span class="mono">score is int</span> • <span class="mono">score &gt; 0</span> •
+          <span class="mono">playerName.size() &lt;= 24</span> • update requires
+          <span class="mono">score &gt;= resource.data.score</span> (monotonic) •
+          <span class="mono">request.auth.uid == playerId</span> (owner-only) • delete denied.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+    var seed = [
+      { name: 'NovaPrime', score: 12400 },
+      { name: 'PixelPirate', score: 9800 },
+      { name: 'OrbitTurtle', score: 8700 },
+      { name: 'QuantumFox', score: 6600 },
+      { name: 'LunaReaper', score: 5400 },
+      { name: 'GridRunner', score: 4300 },
+      { name: 'EchoDrift', score: 3900 },
+      { name: 'HyperNode', score: 3100 },
+      { name: 'StarMite', score: 2400 },
+      { name: 'MegaVoid', score: 1700 }
+    ];
+    var state = { mine: null, entries: seed.map(function (e) { return { name: e.name, score: e.score }; }) };
+
+    var els = {
+      name: document.getElementById('lbd-name'),
+      score: document.getElementById('lbd-score'),
+      submit: document.getElementById('lbd-submit'),
+      reset: document.getElementById('lbd-reset'),
+      auth: document.getElementById('lbd-auth'),
+      outage: document.getElementById('lbd-outage'),
+      bypass: document.getElementById('lbd-bypass'),
+      log: document.getElementById('lbd-log'),
+      board: document.getElementById('lbd-board')
+    };
+
+    function log(cls, msg) {
+      var row = document.createElement('div');
+      var t = document.createElement('span'); t.className = 't';
+      t.textContent = new Date().toLocaleTimeString() + '  ';
+      var m = document.createElement('span'); m.className = cls; m.textContent = msg;
+      row.appendChild(t); row.appendChild(m);
+      els.log.insertBefore(row, els.log.firstChild);
+    }
+
+    // Mirrors LeaderboardManager.SubmitScoreAsync client-side validation.
+    function clientGuard(name, score) {
+      if (!els.auth.checked) return 'rejected — Authentication required: request.auth.uid == playerId (no session)';
+      if (!Number.isInteger(score) || score <= 0) return 'rejected — Score must be a positive integer (server rule: score > 0)';
+      var trimmed = (name || '').trim();
+      if (trimmed.length === 0) return 'rejected — Player name is required (server rule: playerName.size() > 0)';
+      if (trimmed.length > 24) return 'rejected — Player name exceeds 24 chars (server rule: playerName.size() <= 24)';
+      if (state.mine && score <= state.mine.score) {
+        return 'rejected — Client guard: new score (' + score + ') must beat your current best (' + state.mine.score + ')';
+      }
+      return null;
+    }
+
+    // Mirrors firestore.rules allow update/create checks on the server side.
+    function serverRules(name, score) {
+      if (!Number.isInteger(score) || score <= 0) return 'server rejected — score is int && score > 0';
+      var trimmed = (name || '').trim();
+      if (trimmed.length === 0 || trimmed.length > 24) return 'server rejected — playerName.size() between 1 and 24';
+      if (state.mine && score < state.mine.score) {
+        return 'server rejected — monotonic rule: request.resource.data.score >= resource.data.score (' +
+               state.mine.score + ')';
+      }
+      return null;
+    }
+
+    function rankOf(score) {
+      return state.entries.reduce(function (n, e) { return e.score > score ? n + 1 : n; }, 0) + 1;
+    }
+
+    function renderBoard() {
+      var rows = [];
+      state.entries.forEach(function (e) { rows.push(e); });
+      if (state.mine) rows.push(state.mine);
+      rows.sort(function (a, b) { return b.score - a.score; });
+      els.board.innerHTML = '';
+      rows.slice(0, 10).forEach(function (e, i) {
+        var tr = document.createElement('tr');
+        if (state.mine && e === state.mine) tr.className = 'mine';
+        [i + 1, e.name, e.score].forEach(function (cell, ci) {
+          var td = document.createElement('td');
+          if (ci === 2) td.style.textAlign = 'right';
+          td.textContent = cell;
+          tr.appendChild(td);
+        });
+        var check = document.createElement('td');
+        check.style.textAlign = 'right';
+        check.textContent = state.mine && e === state.mine ? 'OK' : '—';
+        tr.appendChild(check);
+        els.board.appendChild(tr);
+      });
+    }
+
+    els.submit.addEventListener('click', function () {
+      var name = els.name.value;
+      var score = parseInt(els.score.value, 10);
+
+      if (!els.bypass.checked) {
+        var clientErr = clientGuard(name, score);
+        if (clientErr) { log('rej', clientErr); return; }
+      }
+
+      if (els.outage.checked && !els.bypass.checked) {
+        // Optimistic update then server failure => rollback (LeaderboardManager behavior).
+        var optimistic = { name: name.trim(), score: score };
+        var prev = state.mine;
+        state.mine = optimistic;
+        log('acc', 'ACCEPTED (optimistic) — rank #' + rankOf(score) + '. Awaiting server confirm...');
+        renderBoard();
+        window.setTimeout(function () {
+          state.mine = prev;
+          log('warn', 'ROLLBACK — network failure; server unreachable. Local best restored to ' +
+              (prev ? prev.score : 'none') + '. No score was recorded server-side.');
+          renderBoard();
+        }, 900);
+        return;
+      }
+
+      if (els.outage.checked) {
+        log('rej', 'server unreachable (simulated outage) — submission dropped');
+        return;
+      }
+
+      var serverErr = serverRules(name, score);
+      if (serverErr) { log('rej', serverErr); return; }
+
+      state.mine = { name: name.trim(), score: score };
+      log('acc', 'ACCEPTED — rank #' + rankOf(score) + '. Firestore write: score ' + score +
+          ', updatedAt set. (monotonic rule satisfied)');
+      renderBoard();
+    });
+
+    els.reset.addEventListener('click', function () {
+      state.mine = null;
+      state.entries = seed.map(function (e) { return { name: e.name, score: e.score }; });
+      els.log.innerHTML = '';
+      els.outage.checked = false;
+      els.bypass.checked = false;
+      els.auth.checked = true;
+      log('t', 'Demo reset — seeded 10 players. Your entry: none.');
+      renderBoard();
+    });
+
+    log('t', 'Demo ready — server rules active (monotonic, owner-only, no deletes). Try submitting a score.');
+    renderBoard();
+  })();
+  </script>
+
+  <h2 id="fsm-anchor" style="margin-top:30px">Interactive demo — gameplay state machine</h2>
+  <div class="card" id="fsm">
+    <p>Simulation of the real loop in <span class="mono">WaveState.cs</span>, <span class="mono">SpawnState.cs</span>,
+    <span class="mono">GameOverState.cs</span> and <span class="mono">GameplayContext.cs</span>. Wave scaling:
+    <span class="mono">enemies = min(5 + wave * 2, MaxEnemiesPerWave)</span> (cap 20); spawn interval
+    <span class="mono">= EnemySpawnRate / max(1, wave * 0.5)</span>; kill = <b>+100</b>; wave-clear bonus
+    = <b>+wave * 500</b>. When all enemies are dead the FSM re-enters <span class="mono">WaveState</span> for the next wave;
+    when the player dies it cleans up and transitions to <span class="mono">GameOverState</span>.</p>
+
+    <div class="controls">
+      <button id="fsm-restart">Start / restart run</button>
+      <button id="fsm-kill" class="danger">💥 Kill an enemy</button>
+      <button id="fsm-hit">💔 Player takes a hit (−1 HP)</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="fsm-auto" checked> auto-play (spawns + kills + damage)</label>
+      <label>speed
+        <select id="fsm-speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><small>State</small><b id="fsm-state">—</b></div>
+      <div class="stat"><small>Wave</small><b id="fsm-wave">0</b></div>
+      <div class="stat"><small>In wave</small><b id="fsm-tospawn">0</b></div>
+      <div class="stat"><small>Spawned</small><b id="fsm-spawned">0</b></div>
+      <div class="stat"><small>Alive</small><b id="fsm-alive">0</b></div>
+      <div class="stat"><small>Killed (wave)</small><b id="fsm-killed">0</b></div>
+      <div class="stat"><small>Score</small><b id="fsm-score">0</b></div>
+    </div>
+
+    <div class="hptrack">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+        <span>Player HP</span><span id="fsm-hptext">5 / 5</span></div>
+      <div class="hpbar"><div class="hpfill" id="fsm-hp"></div></div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <h3 style="margin:0 0 6px">Field — spawned enemies</h3>
+        <div style="background:#0b1018;border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-height:60px">
+          <div class="arena" id="fsm-field"></div>
+        </div>
+        <h3 style="margin:14px 0 6px">Event log (mirrors Unity Debug.Log)</h3>
+        <div class="log" id="fsm-log"></div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 6px">FSM transitions</h3>
+        <div style="background:#0b1018;border:1px solid var(--border);border-radius:8px;padding:12px;font:12px/1.7 Consolas,monospace" id="fsm-trace"></div>
+        <p class="ruling" style="margin-top:10px">
+          Mirror of <span class="mono">WaveState.Tick</span>: spawn until
+          <span class="mono">spawned == toSpawn</span> • wave clear when
+          <span class="mono">spawned &gt;= toSpawn &amp;&amp; alive == 0</span> →
+          <span class="mono">AddWaveScore()</span> then self-transition
+          <span class="mono">TransitionTo&lt;WaveState&gt;()</span> (Enter: wave++) •
+          <span class="mono">IsGameOver</span> → <span class="mono">CleanupEnemies()</span> →
+          <span class="mono">TransitionTo&lt;GameOverState&gt;()</span> → restart via
+          <span class="mono">RequestRestart()</span> → <span class="mono">SpawnState</span>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+    var MAX_HP = 5;
+    var ctx = makeCtx();
+    var phase = 'idle';            // idle | spawn | wave | gameover
+    var playerHitAt = 0;           // next auto-damage timestamp (ms)
+    var enemies = [];              // alive enemies: { born: ms }
+    var nextAutoKill = null;       // timestamp to auto-kill oldest
+    var logEl = document.getElementById('fsm-log');
+    var traceEl = document.getElementById('fsm-trace');
+
+    function makeCtx() {
+      return { wave: 0, enemiesAlive: 0, enemiesKilledThisWave: 0, score: 0,
+               totalInWave: 0, isGameOver: false, spawned: 0, toSpawn: 0, spawnTimer: 0,
+               maxEnemiesPerWave: 20, enemySpawnRate: 2.0, hp: MAX_HP };
+    }
+
+    function f(id) { return document.getElementById(id); }
+    function log(cls, msg) {
+      var row = document.createElement('div');
+      var t = document.createElement('span'); t.className = 't';
+      t.textContent = new Date().toLocaleTimeString() + '  ';
+      var m = document.createElement('span'); m.className = cls; m.textContent = msg;
+      row.appendChild(t); row.appendChild(m);
+      logEl.insertBefore(row, logEl.firstChild);
+    }
+    function trace(msg) {
+      var div = document.createElement('div');
+      div.textContent = msg;
+      traceEl.insertBefore(div, traceEl.firstChild);
+      while (traceEl.children.length > 40) traceEl.removeChild(traceEl.lastChild);
+    }
+
+    // Mirrors WaveState.Enter(): wave++, reset counters, compute scaling.
+    function enterWave() {
+      ctx.wave += 1;
+      ctx.enemiesKilledThisWave = 0;
+      ctx.enemiesAlive = 0;
+      ctx.toSpawn = Math.min(5 + ctx.wave * 2, ctx.maxEnemiesPerWave);
+      ctx.totalInWave = ctx.toSpawn;
+      ctx.spawned = 0;
+      ctx.spawnTimer = 0;
+      phase = 'wave';
+      trace('[FSM] -> WaveState');
+      log('tr', '[WaveState] Wave ' + ctx.wave + ' started. Spawning ' + ctx.toSpawn + ' enemies.');
+    }
+
+    // Mirrors SpawnState.Enter(): reset for a fresh run, then first wave.
+    function spawnPlayer() {
+      ctx = makeCtx();
+      enemies = [];
+      phase = 'spawn';
+      trace('[FSM] -> SpawnState');
+      log('tr', '[SpawnState] Spawning player (HP ' + ctx.hp + '/' + MAX_HP + ')...');
+      enterWave(); // SpawnState.Enter ends with TransitionTo<WaveState> (logged in enterWave)
+      nextAutoKill = null;
+      playerHitAt = Date.now() + 6000 + Math.random() * 4000;
+    }
+
+    // Mirrors GameplayContext.AddKillScore(basePoints = 100).
+    function killEnemy() {
+      if (phase !== 'wave' || ctx.enemiesAlive <= 0) return false;
+      ctx.score += 100;
+      ctx.enemiesKilledThisWave += 1;
+      ctx.enemiesAlive -= 1;
+      enemies.shift();
+      log('clr', '[kill] +100  (' + ctx.enemiesKilledThisWave + '/' + ctx.totalInWave + ' this wave)');
+      return true;
+    }
+
+    function damagePlayer() {
+      if (phase === 'gameover') return;
+      ctx.hp -= 1;
+      log('ko', '[player] took a hit — HP ' + Math.max(0, ctx.hp) + '/' + MAX_HP);
+      if (ctx.hp <= 0) {
+        ctx.isGameOver = true; // e.g. set by health system in the real game
+        log('ko', '[health] player down — IsGameOver = true');
+      }
+    }
+
+    // Mirrors WaveState.Tick: on all-dead, AddWaveScore then next wave or game over.
+    function checkWaveClear() {
+      var allSpawned = ctx.spawned >= ctx.toSpawn;
+      var allDead = ctx.enemiesAlive === 0;
+      if (allSpawned && allDead) {
+        var bonus = ctx.wave * 500; // AddWaveScore(): Score += CurrentWave * 500
+        ctx.score += bonus;
+        log('clr', '[WaveState] Wave ' + ctx.wave + ' cleared! +' + bonus + ' wave bonus. Total: ' + ctx.score);
+        if (ctx.isGameOver) {
+          toGameOver();
+          return;
+        }
+        enterWave(); // transition back to itself via Exit/Enter
+      } else if (ctx.isGameOver) {
+        // Mirrors the late game-over check in WaveState.Tick.
+        log('ko', '[WaveState] CleanupEnemies() — destroying ' + ctx.enemiesAlive + ' remaining.');
+        enemies = [];
+        ctx.enemiesAlive = 0;
+        toGameOver();
+      }
+    }
+
+    function toGameOver() {
+      phase = 'gameover';
+      trace('[FSM] -> GameOverState');
+      log('ko', '[GameOverState] Game Over! Wave: ' + ctx.wave + ', Score: ' + ctx.score);
+      log('ko', '[GameOverState] OnGameOverEntered(wave ' + ctx.wave + ', score ' + ctx.score + ')' +
+          ' — ready for RequestRestart()');
+    }
+
+    function step(dt) {
+      if (phase !== 'wave') return;
+
+      // --- Spawning (mirrors WaveState.Tick) ---
+      if (ctx.spawned < ctx.toSpawn) {
+        ctx.spawnTimer += dt;
+        var interval = ctx.enemySpawnRate / Math.max(1, ctx.wave * 0.5);
+        while (ctx.spawnTimer >= interval && ctx.spawned < ctx.toSpawn) {
+          ctx.spawnTimer -= interval;
+          enemies.push({ born: Date.now() });
+          ctx.enemiesAlive += 1;
+          ctx.spawned += 1;
+        }
+      }
+
+      // --- Auto-play: kill each enemy ~1s after it spawns, random player damage ---
+      if (f('fsm-auto').checked && enemies.length) {
+        var oldest = enemies[0];
+        if (nextAutoKill === null || Date.now() > nextAutoKill) {
+          if (Date.now() - oldest.born > 1000) killEnemy();
+          nextAutoKill = Date.now() + 400;
+        }
+      }
+      if (f('fsm-auto').checked && Date.now() >= playerHitAt) {
+        damagePlayer();
+        playerHitAt = Date.now() + 6000 + Math.random() * 4000;
+      }
+
+      checkWaveClear();
+    }
+
+    // Tick at 200 ms; dt scales with the speed selector.
+    setInterval(function () {
+      var dt = 0.2 * parseFloat(f('fsm-speed').value || '1');
+      step(dt);
+      render();
+    }, 200);
+
+    function render() {
+      var pill = f('fsm-state');
+      pill.className = 'pill ' + (phase === 'wave' ? 'wave' : phase === 'gameover' ? 'over' : 'spawn');
+      pill.textContent = phase === 'spawn' ? 'SpawnState' : phase === 'wave' ? 'WaveState' : phase === 'gameover' ? 'GameOverState' : 'idle';
+      f('fsm-wave').textContent = ctx.wave;
+      f('fsm-tospawn').textContent = ctx.toSpawn;
+      f('fsm-spawned').textContent = ctx.spawned;
+      f('fsm-alive').textContent = ctx.enemiesAlive;
+      f('fsm-killed').textContent = ctx.enemiesKilledThisWave;
+      f('fsm-score').textContent = ctx.score;
+      f('fsm-hptext').textContent = Math.max(0, ctx.hp) + ' / ' + MAX_HP;
+      f('fsm-hp').style.width = Math.max(0, (ctx.hp / MAX_HP) * 100) + '%';
+      f('fsm-kill').disabled = phase !== 'wave' || ctx.enemiesAlive <= 0;
+      f('fsm-hit').disabled = phase === 'gameover';
+      f('fsm-field').innerHTML = '';
+      for (var i = 0; i < Math.min(enemies.length, 60); i++) {
+        var e = document.createElement('span');
+        e.className = 'enemy';
+        f('fsm-field').appendChild(e);
+      }
+    }
+
+    f('fsm-restart').addEventListener('click', function () {
+      spawnPlayer();
+      log('tr', '[run] fresh run started');
+      render();
+    });
+    f('fsm-kill').addEventListener('click', function () {
+      if (killEnemy()) checkWaveClear();
+      render();
+    });
+    f('fsm-hit').addEventListener('click', function () {
+      damagePlayer();
+      checkWaveClear();
+      render();
+    });
+
+    log('t', 'Demo ready — press Start / restart run (or wait: auto-play is on).');
+    trace('awaiting SpawnState...');
+    render();
+  })();
+  </script>
+
+  <p class="note" style="margin-top:18px">Static snapshot of the repo at branch <b>main</b>, commit <b>4ddd5f5</b> — generated 2026-09-05.
+  Not a Unity WebGL build; this page documents and visualizes the architecture and its server-side artifacts.
+  Headless verification suite (41 assertions) passes on Linux CI: <span class="mono">RESULTS: 41/41 passed, 0 failed</span>.</p>
+
+</main>
+</body>
+</html>
