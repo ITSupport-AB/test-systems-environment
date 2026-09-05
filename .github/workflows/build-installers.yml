@@ -1,0 +1,112 @@
+name: Build installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify build prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.project.outputs.ready }}
+    env:
+      HAS_UNITY_LICENSE: ${{ secrets.UNITY_LICENSE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Unity license and project files
+        id: project
+        shell: bash
+        run: |
+          if [ "$HAS_UNITY_LICENSE" != "true" ]; then
+            echo "::notice title=UNITY_LICENSE missing::Installer builds are skipped until the UNITY_LICENSE secret is configured."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ ! -f ProjectSettings/ProjectVersion.txt ]; then
+            echo "::notice title=Unity project missing::Open the repository in Unity Hub once to generate ProjectSettings/ProjectVersion.txt."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: ${{ matrix.name }}
+    needs: verify
+    if: needs.verify.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android APK
+            slug: android-apk
+            target: Android
+            format: apk
+            output: Builds/Android/Freebuff.apk
+            archive: apk
+          - name: Android App Bundle
+            slug: android-aab
+            target: Android
+            format: aab
+            output: Builds/Android/Freebuff.aab
+            archive: aab
+          - name: Windows installer archive
+            slug: windows
+            target: StandaloneWindows64
+            format: player
+            output: Builds/Windows/Freebuff.exe
+            package: Builds/Windows
+            archive: zip
+          - name: Linux installer archive
+            slug: linux
+            target: StandaloneLinux64
+            format: player
+            output: Builds/Linux/Freebuff.x86_64
+            package: Builds/Linux
+            archive: tar.gz
+          - name: WebGL package
+            slug: webgl
+            target: WebGL
+            format: player
+            output: Builds/WebGL
+            package: Builds/WebGL
+            archive: zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-2022.3.22f1-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-${{ runner.os }}-2022.3.22f1-
+      - name: Build Unity player
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_FORMAT: ${{ matrix.format }}
+          BUILD_OUTPUT: ${{ matrix.output }}
+        with:
+          unityVersion: auto
+          targetPlatform: ${{ matrix.target }}
+          buildMethod: InstallerBuild.Build
+          customParameters: -quit
+          manualExit: 'true'
+      - name: Package artifact
+        shell: bash
+        run: |
+          mkdir -p packaged
+          case "${{ matrix.archive }}" in
+            apk|aab) cp "${{ matrix.output }}" "packaged/Freebuff-${{ matrix.slug }}.${{ matrix.archive }}" ;;
+            zip) zip -r "packaged/Freebuff-${{ matrix.slug }}.zip" "${{ matrix.package }}" ;;
+            tar.gz) tar -czf "packaged/Freebuff-${{ matrix.slug }}.tar.gz" "${{ matrix.package }}" ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Freebuff-${{ matrix.slug }}
+          path: packaged/*
+          if-no-files-found: error

@@ -33,6 +33,13 @@ docs/project-overview.html            Architecture overview + interactive demos 
 
 ## CI
 
+`.github/workflows/build-installers.yml` builds downloadable artifacts on version tags
+(`v*`) or manual dispatch: Android APK/AAB, Windows ZIP, Linux TAR.GZ, and WebGL ZIP.
+It skips cleanly until `UNITY_LICENSE`, `ProjectSettings/ProjectVersion.txt`, and the
+normal Unity project files are present. iOS is intentionally not included in this Linux
+matrix because it requires a macOS runner, Apple signing certificates, and provisioning
+profiles.
+
 `.github/workflows/ci.yml` runs on pull requests and pushes to `main`:
 
 1. **Headless tests** — `perl Assets/Tests/Editor/test_leaderboard_headless.pl`
