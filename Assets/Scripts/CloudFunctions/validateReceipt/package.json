@@ -2,7 +2,7 @@
   "name": "freebuff-cloud-functions",
   "version": "1.0.0",
   "description": "Cloud Functions for Freebuff Desktop receipt validation and VIP management",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
     "serve": "firebase emulators:start --only functions",
@@ -10,7 +10,7 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

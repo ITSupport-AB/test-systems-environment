@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {Request, Response} from "express";
+import * as crypto from "crypto";
 
 const MAX_WORKER_TEMPERATURE_C = 85;
 
@@ -9,6 +10,7 @@ function firestore(): admin.firestore.Firestore {
 }
 
 type WorkerCommand = "START" | "STOP" | "RESTART";
+type WorkerState = "RUNNING" | "STOPPED" | "OFFLINE" | "UNKNOWN";
 
 function setCors(response: Response): void {
   response.set("Access-Control-Allow-Origin", "*");
@@ -25,6 +27,24 @@ async function authenticate(request: Request): Promise<admin.auth.DecodedIdToken
   return admin.auth().verifyIdToken(header.substring("Bearer ".length));
 }
 
+async function authenticateAgent(request: Request, workerId: string): Promise<{uid: string}> {
+  const header = request.headers["x-worker-key"];
+  const key = Array.isArray(header) ? header[0] : header;
+  if (!key) {
+    throw new functions.https.HttpsError("unauthenticated", "A worker key is required.");
+  }
+
+  const agent = await firestore().collection("workerAgents").doc(workerId).get();
+  const data = agent.data() || {};
+  const expected = Buffer.from(String(data.keyHash || ""), "hex");
+  const supplied = crypto.createHash("sha256").update(key).digest();
+  if (!agent.exists || expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    throw new functions.https.HttpsError("unauthenticated", "Worker authentication failed.");
+  }
+
+  return {uid: String(data.uid)};
+}
+
 function workerRef(uid: string, workerId: string): admin.firestore.DocumentReference {
   return firestore().collection("users").doc(uid).collection("workers").doc(workerId);
 }
@@ -34,6 +54,8 @@ function workerResponse(snapshot: admin.firestore.DocumentSnapshot): Record<stri
   return {
     id: snapshot.id,
     name: data.name || snapshot.id,
+    coin: data.coin || "unknown",
+    network: data.network || "unknown",
     algorithm: data.algorithm || "unknown",
     state: data.state || "UNKNOWN",
     hashrate: data.hashrate || "--",
@@ -46,6 +68,61 @@ function workerResponse(snapshot: admin.firestore.DocumentSnapshot): Record<stri
 async function listWorkers(uid: string): Promise<Record<string, unknown>[]> {
   const snapshot = await firestore().collection("users").doc(uid).collection("workers").get();
   return snapshot.docs.map(workerResponse);
+}
+
+async function recordHeartbeat(uid: string, workerId: string, body: Record<string, unknown>): Promise<void> {
+  const state = String(body.state || "").toUpperCase() as WorkerState;
+  const coin = String(body.coin || "");
+  const network = String(body.network || "");
+  const algorithm = String(body.algorithm || "");
+  const temperature = Number(body.temperatureCelsius);
+  const hashrate = String(body.hashrate || "--");
+  const uptime = String(body.uptime || "--");
+  if (!["RUNNING", "STOPPED", "OFFLINE", "UNKNOWN"].includes(state)) {
+    throw new functions.https.HttpsError("invalid-argument", "Unsupported worker state.");
+  }
+  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 150) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid worker temperature.");
+  }
+  if (hashrate.length > 64 || uptime.length > 64) {
+    throw new functions.https.HttpsError("invalid-argument", "Worker telemetry field is too long.");
+  }
+  if (!coin || !network || !algorithm || [coin, network, algorithm].some((value) => value.length > 64)) {
+    throw new functions.https.HttpsError("invalid-argument", "Coin, network, and algorithm are required.");
+  }
+
+  await workerRef(uid, workerId).set({
+    coin,
+    network,
+    algorithm,
+    state,
+    hashrate,
+    temperatureCelsius: temperature,
+    uptime,
+    lastSeen: new Date().toISOString(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+}
+
+async function claimCommands(uid: string, workerId: string): Promise<Record<string, unknown>[]> {
+  const db = firestore();
+  const snapshot = await db.collection("users").doc(uid).collection("workerCommands")
+    .where("workerId", "==", workerId)
+    .where("status", "==", "QUEUED")
+    .limit(10)
+    .get();
+
+  const commands: Record<string, unknown>[] = [];
+  const batch = db.batch();
+  snapshot.docs.forEach((command) => {
+    commands.push({id: command.id, ...command.data(), status: "DISPATCHED"});
+    batch.update(command.ref, {
+      status: "DISPATCHED",
+      dispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  if (commands.length > 0) await batch.commit();
+  return commands;
 }
 
 async function queueCommand(
@@ -106,8 +183,24 @@ export const workerGateway = functions.https.onRequest(async (request, response)
   }
 
   try {
-    const identity = await authenticate(request);
     const path = request.path.replace(/^\/v1/, "").replace(/\/$/, "");
+
+    const heartbeatMatch = path.match(/^\/agent\/workers\/([^/]+)\/heartbeat$/);
+    if (request.method === "POST" && heartbeatMatch) {
+      const agent = await authenticateAgent(request, heartbeatMatch[1]);
+      await recordHeartbeat(agent.uid, heartbeatMatch[1], request.body || {});
+      response.status(204).send("");
+      return;
+    }
+
+    const agentCommandsMatch = path.match(/^\/agent\/workers\/([^/]+)\/commands$/);
+    if (request.method === "GET" && agentCommandsMatch) {
+      const agent = await authenticateAgent(request, agentCommandsMatch[1]);
+      response.status(200).json({commands: await claimCommands(agent.uid, agentCommandsMatch[1])});
+      return;
+    }
+
+    const identity = await authenticate(request);
 
     if (request.method === "GET" && path === "/workers") {
       response.status(200).json(await listWorkers(identity.uid));

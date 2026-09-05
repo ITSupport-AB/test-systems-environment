@@ -41,7 +41,9 @@ The first API contract should expose:
 The first Firebase gateway implementation lives in `Assets/Scripts/CloudFunctions/validateReceipt/workerGateway.ts`.
 It authenticates Firebase ID tokens, reads user-owned worker documents, queues commands, applies a
 temperature/offline guard, and rejects reused idempotency keys. A separate worker agent still needs
-to consume `users/{uid}/workerCommands` and report telemetry back to Firestore.
+to consume `users/{uid}/workerCommands` and report telemetry back to Firestore. The gateway now
+exposes agent-only heartbeat and command-claim routes using a server-provisioned SHA-256 worker-key
+hash stored at `workerAgents/{workerId}`; the raw worker key must never be stored in Firestore.
 
 Commands should be authorized server-side, logged, rate-limited, and rejected when the worker is stale or over its configured temperature limit. The gateway must persist and enforce each client-provided idempotency key so retries cannot execute a command twice. The Android client is not a security boundary.
 
@@ -53,6 +55,18 @@ Commands should be authorized server-side, logged, rate-limited, and rejected wh
 4. Keep telemetry low-bandwidth by sending aggregates and only requesting detailed samples on demand.
 5. Use exponential backoff for unavailable workers and never spin a tight retry loop.
 6. Make temperature and power limits explicit safety controls owned by the worker agent.
+
+## How work is sourced
+
+The production path is pooled mining. A pool connects to the selected blockchain network,
+creates current block-template jobs, and sends Stratum work to the miner. The miner returns
+shares; the pool tracks accepted work and pays according to its published payout rules. The
+Android app should select a coin/profile, but it should never construct block templates or
+hold chain private keys.
+
+Solo mining is a separate product mode requiring a fully synchronized coin node, a stratum
+bridge, reliable peer connectivity, and a payout address compatible with that chain. The
+worker agent rejects solo mode until those components are installed and tested.
 
 ## Security and abuse controls
 

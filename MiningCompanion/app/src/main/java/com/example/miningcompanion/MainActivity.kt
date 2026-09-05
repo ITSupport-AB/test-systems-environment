@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Button
@@ -55,13 +56,23 @@ private val Sun = Color(0xFFF2B544)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val authViewModel = androidx.lifecycle.ViewModelProvider(this)[AuthViewModel::class.java]
         val workerViewModel = androidx.lifecycle.ViewModelProvider(this)[WorkerViewModel::class.java]
-        setContent { MiningCompanionApp(workerViewModel) }
+        setContent { App(authViewModel, workerViewModel) }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun MiningCompanionApp(viewModel: WorkerViewModel) {
+private fun App(authViewModel: AuthViewModel, workerViewModel: WorkerViewModel) {
+    val authState by authViewModel.state.collectAsStateWithLifecycle()
+    when (authState) {
+        is AuthState.SignedIn -> MiningCompanionApp(workerViewModel, authViewModel::signOut)
+        else -> AuthScreen(authState, authViewModel::signIn, authViewModel::createAccount)
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun MiningCompanionApp(viewModel: WorkerViewModel, onSignOut: () -> Unit) {
     val screenState by viewModel.state.collectAsStateWithLifecycle()
     val worker = screenState.workers.firstOrNull()
     val isRunning = worker?.state == WorkerState.RUNNING
@@ -85,8 +96,13 @@ private fun MiningCompanionApp(viewModel: WorkerViewModel) {
                             Text("MINING COMPANION", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Text("Control room", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                         }
-                        IconButton(onClick = viewModel::refresh) {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh connection", tint = Ink)
+                        Row {
+                            IconButton(onClick = viewModel::refresh) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = "Refresh connection", tint = Ink)
+                            }
+                            IconButton(onClick = onSignOut) {
+                                Icon(Icons.Outlined.Logout, contentDescription = "Sign out", tint = Ink)
+                            }
                         }
                     }
                 }
@@ -123,7 +139,8 @@ private fun MiningCompanionApp(viewModel: WorkerViewModel) {
                                 }
                                 Spacer(Modifier.height(10.dp))
                                 Text(worker.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                                Text("${worker.state.name.lowercase().replaceFirstChar { it.uppercase() }} | Last seen ${worker.lastSeen}", color = Color(0xFFB8CCC5), fontSize = 14.sp)
+                                Text("${worker.coin} ${worker.network} | ${worker.algorithm} | ${worker.state.name.lowercase().replaceFirstChar { it.uppercase() }}", color = Color(0xFFB8CCC5), fontSize = 14.sp)
+                                Text("Last seen ${worker.lastSeen}", color = Color(0xFF8FA9A0), fontSize = 12.sp)
                                 Spacer(Modifier.height(18.dp))
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Metric("HASHRATE", worker.hashrate)
@@ -231,6 +248,67 @@ private fun ConnectCard(token: String, onTokenChanged: (String) -> Unit, onConne
                 colors = ButtonDefaults.buttonColors(containerColor = Mint)
             ) {
                 Text("Connect", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun AuthScreen(
+    authState: AuthState,
+    onSignIn: (String, String) -> Unit,
+    onCreateAccount: (String, String) -> Unit
+) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var createAccount by rememberSaveable { mutableStateOf(false) }
+    val isLoading = authState is AuthState.Loading
+    val error = (authState as? AuthState.Error)?.message
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("MINING COMPANION", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(if (createAccount) "Create your account" else "Welcome back", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("Sign in to access your remote worker controls.", color = Color(0xFF6B7772), fontSize = 14.sp)
+            Spacer(Modifier.height(22.dp))
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Email") }
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation()
+            )
+            error?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, color = Color(0xFFC45744), fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { if (createAccount) onCreateAccount(email, password) else onSignIn(email, password) },
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Mint)
+            ) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                else Text(if (createAccount) "Create account" else "Sign in", fontWeight = FontWeight.Bold)
+            }
+            TextButton(onClick = { createAccount = !createAccount }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(if (createAccount) "Already have an account? Sign in" else "New here? Create an account", color = Mint)
             }
         }
     }

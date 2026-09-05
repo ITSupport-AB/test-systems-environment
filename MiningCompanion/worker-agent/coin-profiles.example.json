@@ -1,0 +1,25 @@
+{
+  "profiles": [
+    {
+      "coin": "monero",
+      "network": "mainnet",
+      "algorithm": "randomx",
+      "hardware": "cpu",
+      "pool_url": "stratum+ssl://REPLACE_WITH_A_MONERO_POOL:443"
+    },
+    {
+      "coin": "litecoin",
+      "network": "mainnet",
+      "algorithm": "scrypt",
+      "hardware": "scrypt-asic",
+      "pool_url": "stratum+ssl://REPLACE_WITH_A_LITECOIN_POOL:443"
+    },
+    {
+      "coin": "kaspa",
+      "network": "mainnet",
+      "algorithm": "kheavyhash",
+      "hardware": "kaspa-asic-or-gpu",
+      "pool_url": "stratum+ssl://REPLACE_WITH_A_KASPA_POOL:443"
+    }
+  ]
+}

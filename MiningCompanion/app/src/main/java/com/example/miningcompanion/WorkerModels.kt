@@ -3,6 +3,8 @@ package com.example.miningcompanion
 data class Worker(
     val id: String,
     val name: String,
+    val coin: String,
+    val network: String,
     val algorithm: String,
     val state: WorkerState,
     val hashrate: String,

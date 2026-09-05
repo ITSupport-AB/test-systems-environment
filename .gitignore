@@ -91,3 +91,7 @@ __pycache__/
 # Editor config
 # ======================================================================
 .vscode/
+
+# Node/Firebase Functions generated files
+node_modules/
+lib/

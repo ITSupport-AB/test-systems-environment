@@ -1,0 +1,26 @@
+{
+  "gateway_url": "https://us-central1-example.cloudfunctions.net/workerGateway",
+  "worker_id": "atlas-rig-01",
+  "worker_key": "provision-this-out-of-band",
+  "coin": "replace-with-supported-coin",
+  "network": "mainnet",
+  "work_source": "pool",
+  "pool_url": "stratum+ssl://pool.example.com:443",
+  "pool_user": "replace-with-pool-username-or-wallet",
+  "pool_password": "x",
+  "worker_name": "atlas-rig-01",
+  "payout_address": "paste-the-Luno-receiving-address-here",
+  "algorithm": "algorithm-name",
+  "telemetry_command": ["/opt/miner/bin/minerctl", "status", "--json"],
+  "poll_interval_seconds": 30,
+  "worker_state": "STOPPED",
+  "telemetry": {
+    "hashrate": "--",
+    "temperature_celsius": 0
+  },
+  "commands": {
+    "START": ["/opt/miner/bin/minerctl", "start", "--coin", "{coin}", "--network", "{network}", "--pool", "{pool_url}", "--user", "{pool_user}", "--password", "{pool_password}", "--worker", "{worker_name}", "--wallet", "{payout_address}", "--algorithm", "{algorithm}"],
+    "STOP": ["/opt/miner/bin/minerctl", "stop"],
+    "RESTART": ["/opt/miner/bin/minerctl", "restart", "--coin", "{coin}", "--network", "{network}", "--pool", "{pool_url}", "--user", "{pool_user}", "--password", "{pool_password}", "--worker", "{worker_name}", "--wallet", "{payout_address}", "--algorithm", "{algorithm}"]
+  }
+}

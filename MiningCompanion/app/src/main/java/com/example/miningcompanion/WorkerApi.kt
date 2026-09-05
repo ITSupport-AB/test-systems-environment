@@ -62,6 +62,8 @@ class WorkerApi(
     private fun JSONObject.toWorker(): Worker = Worker(
         id = getString("id"),
         name = getString("name"),
+        coin = optString("coin", "unknown"),
+        network = optString("network", "unknown"),
         algorithm = optString("algorithm", "unknown"),
         state = runCatching { WorkerState.valueOf(optString("state").uppercase()) }.getOrDefault(WorkerState.UNKNOWN),
         hashrate = optString("hashrate", "--"),
