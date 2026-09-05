@@ -16,6 +16,8 @@ The worker values are currently local demo state. The next integration replaces 
 
 The app uses Firebase Authentication for email/password sign-in and exchanges the Firebase ID token with the worker gateway. Add the Firebase Console-generated `google-services.json` to `app/` locally or through the CI secret workflow; do not commit it if your project treats it as confidential. Enable Email/Password under Firebase Authentication before testing sign-in.
 
+The gateway can retrieve a Luno receiving address with `GET /v1/payout/luno/address?asset=XBT`. Configure the Luno key server-side with only `Perm_R_Addresses` using `firebase functions:config:set luno.key_id=... luno.key_secret=...`. Never put those values in Android, `config.json`, or source control.
+
 ## Build
 
 Open `MiningCompanion` in Android Studio and use JDK 17 with Android SDK 35. The project expects the Android Gradle Plugin and Kotlin plugins to be downloaded from Google Maven and Maven Central.

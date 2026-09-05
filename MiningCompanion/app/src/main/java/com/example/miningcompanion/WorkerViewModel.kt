@@ -47,4 +47,13 @@ class WorkerViewModel(application: Application) : AndroidViewModel(application) 
                 .onFailure { error -> mutableState.value = mutableState.value.copy(pendingCommand = null, errorMessage = error.message) }
         }
     }
+
+    fun loadLunoAddress(asset: String) {
+        mutableState.value = mutableState.value.copy(payoutLoading = true, payoutError = null, payoutAsset = asset)
+        viewModelScope.launch {
+            runCatching { api.getLunoFundingAddress(asset) }
+                .onSuccess { (address, _) -> mutableState.value = mutableState.value.copy(payoutLoading = false, payoutAddress = address) }
+                .onFailure { error -> mutableState.value = mutableState.value.copy(payoutLoading = false, payoutError = error.message) }
+        }
+    }
 }

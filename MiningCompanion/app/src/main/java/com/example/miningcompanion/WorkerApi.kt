@@ -13,6 +13,11 @@ class WorkerApi(
     private val baseUrl: String,
     private val sessionStore: SessionStore
 ) {
+    suspend fun getLunoFundingAddress(asset: String): Pair<String, String?> = withContext(Dispatchers.IO) {
+        val response = JSONObject(request("GET", "/v1/payout/luno/address?asset=${asset.uppercase()}"))
+        response.getString("address") to response.optString("network").ifBlank { null }
+    }
+
     suspend fun getWorkers(): List<Worker> = withContext(Dispatchers.IO) {
         val response = request("GET", "/v1/workers")
         val workers = if (response.trimStart().startsWith("[")) {

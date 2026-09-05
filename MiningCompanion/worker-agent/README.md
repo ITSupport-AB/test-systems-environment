@@ -16,6 +16,14 @@ This process runs on the user's own mining rig. It polls the Firebase worker gat
 python agent.py
 ```
 
+Run the local safety tests with:
+
+```text
+python -m unittest test_agent.py
+```
+
 The agent rejects non-HTTPS gateways, rejects solo mode without a node/stratum bridge, and invokes commands with `shell=False`. Keep `config.json` readable only by the service account and never commit it.
+
+For a Linux rig, install `worker-agent.service.example` as `/etc/systemd/system/mining-worker-agent.service`, copy the private configuration to `/etc/mining-companion/config.json`, then enable it with `systemctl enable --now mining-worker-agent.service`. Create the `mining-agent` service account and grant it only the permissions required to invoke the miner controller.
 
 The pool supplies current work from the selected blockchain and pays accepted shares according to its payout rules. Luno must support deposits for the selected coin and network; do not assume a Luno address works for every coin. The agent does not currently call Luno. Luno address discovery must be added server-side against the current official Luno API after verifying account permissions and withdrawal-address behavior. Never place Luno API keys, secrets, or wallet seed phrases in the Android app or worker config.

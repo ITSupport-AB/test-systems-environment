@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {Request, Response} from "express";
 import * as crypto from "crypto";
+import * as https from "https";
 
 const MAX_WORKER_TEMPERATURE_C = 85;
 
@@ -68,6 +69,45 @@ function workerResponse(snapshot: admin.firestore.DocumentSnapshot): Record<stri
 async function listWorkers(uid: string): Promise<Record<string, unknown>[]> {
   const snapshot = await firestore().collection("users").doc(uid).collection("workers").get();
   return snapshot.docs.map(workerResponse);
+}
+
+async function getLunoFundingAddress(asset: string): Promise<Record<string, unknown>> {
+  const config = functions.config().luno || {};
+  const keyId = String(config.key_id || "");
+  const keySecret = String(config.key_secret || "");
+  if (!keyId || !keySecret) {
+    throw new functions.https.HttpsError("failed-precondition", "Luno integration is not configured.");
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      `https://api.luno.com/api/1/funding_address?asset=${encodeURIComponent(asset)}`,
+      {
+        auth: `${keyId}:${keySecret}`,
+        headers: {Accept: "application/json"},
+        timeout: 10_000,
+      },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => { body += chunk; });
+        response.on("end", () => {
+          if (response.statusCode !== 200) {
+            reject(new functions.https.HttpsError("unavailable", "Luno address lookup failed."));
+            return;
+          }
+          try {
+            const parsed = JSON.parse(body);
+            resolve({asset: parsed.asset, address: parsed.address, network: parsed.network || null});
+          } catch {
+            reject(new functions.https.HttpsError("internal", "Luno returned an invalid response."));
+          }
+        });
+      }
+    );
+    request.on("timeout", () => request.destroy(new Error("Luno request timed out")));
+    request.on("error", () => reject(new functions.https.HttpsError("unavailable", "Luno is unavailable.")));
+  });
 }
 
 async function recordHeartbeat(uid: string, workerId: string, body: Record<string, unknown>): Promise<void> {
@@ -204,6 +244,15 @@ export const workerGateway = functions.https.onRequest(async (request, response)
 
     if (request.method === "GET" && path === "/workers") {
       response.status(200).json(await listWorkers(identity.uid));
+      return;
+    }
+
+    if (request.method === "GET" && path === "/payout/luno/address") {
+      const asset = String(request.query.asset || "").toUpperCase();
+      if (!/^[A-Z0-9]{2,12}$/.test(asset)) {
+        throw new functions.https.HttpsError("invalid-argument", "A valid Luno asset is required.");
+      }
+      response.status(200).json(await getLunoFundingAddress(asset));
       return;
     }
 

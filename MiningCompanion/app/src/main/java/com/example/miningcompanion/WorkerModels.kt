@@ -30,5 +30,9 @@ data class WorkerScreenState(
     val isLoading: Boolean = true,
     val workers: List<Worker> = emptyList(),
     val errorMessage: String? = null,
-    val pendingCommand: WorkerCommand? = null
+    val pendingCommand: WorkerCommand? = null,
+    val payoutAsset: String? = null,
+    val payoutAddress: String? = null,
+    val payoutLoading: Boolean = false,
+    val payoutError: String? = null
 )

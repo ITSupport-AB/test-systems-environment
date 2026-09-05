@@ -1,0 +1,22 @@
+[Unit]
+Description=Mining Companion worker agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mining-agent
+Group=mining-agent
+WorkingDirectory=/opt/mining-companion/worker-agent
+Environment=MINING_AGENT_CONFIG=/etc/mining-companion/config.json
+ExecStart=/usr/bin/python3 /opt/mining-companion/worker-agent/agent.py
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mining-companion
+
+[Install]
+WantedBy=multi-user.target

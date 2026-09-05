@@ -95,3 +95,6 @@ __pycache__/
 # Node/Firebase Functions generated files
 node_modules/
 lib/
+
+# Private worker credentials and payout configuration
+MiningCompanion/worker-agent/config.json

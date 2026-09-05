@@ -84,3 +84,4 @@ worker agent rejects solo mode until those components are installed and tested.
 - [Android foreground services overview](https://developer.android.com/develop/background-work/services/fgs)
 - [Android power and performance guidance](https://developer.android.com/topic/performance/power)
 - [Android Keystore system](https://developer.android.com/privacy-and-security/keystore)
+- [Luno API reference](https://www.luno.com/en/developers/api) (`GET /api/1/funding_address`, `Perm_R_Addresses`)

@@ -24,7 +24,9 @@ class AgentError(Exception):
 
 class WorkerAgent:
     def __init__(self, config):
-        self.config = config
+        self.config = dict(config)
+        self.config.setdefault("pool_user", self.config.get("payout_address", ""))
+        self.config.setdefault("pool_password", "x")
         self.running = True
         self.started_at = time.monotonic()
 

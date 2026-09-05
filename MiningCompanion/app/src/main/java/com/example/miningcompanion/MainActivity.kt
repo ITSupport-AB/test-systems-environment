@@ -76,6 +76,7 @@ private fun MiningCompanionApp(viewModel: WorkerViewModel, onSignOut: () -> Unit
     val screenState by viewModel.state.collectAsStateWithLifecycle()
     val worker = screenState.workers.firstOrNull()
     val isRunning = worker?.state == WorkerState.RUNNING
+    val lunoAsset = worker?.let(::lunoAssetFor)
     var accessToken by rememberSaveable { mutableStateOf("") }
     var requestedCommand by rememberSaveable { mutableStateOf<WorkerCommand?>(null) }
 
@@ -163,6 +164,17 @@ private fun MiningCompanionApp(viewModel: WorkerViewModel, onSignOut: () -> Unit
                             Icon(if (isRunning) Icons.Outlined.StopCircle else Icons.Outlined.Bolt, contentDescription = null)
                             Text(if (screenState.pendingCommand != null) "  Sending command..." else if (isRunning) "  Stop worker" else "  Start worker", fontWeight = FontWeight.Bold)
                         }
+                    }
+                }
+                item {
+                    if (worker != null) {
+                        LunoCard(
+                            asset = lunoAsset,
+                            address = screenState.payoutAddress,
+                            isLoading = screenState.payoutLoading,
+                            error = screenState.payoutError,
+                            onLoad = { lunoAsset?.let(viewModel::loadLunoAddress) }
+                        )
                     }
                 }
                 item {
@@ -309,6 +321,45 @@ private fun AuthScreen(
             }
             TextButton(onClick = { createAccount = !createAccount }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(if (createAccount) "Already have an account? Sign in" else "New here? Create an account", color = Mint)
+            }
+        }
+    }
+}
+
+private fun lunoAssetFor(worker: Worker): String? = when (worker.coin.lowercase()) {
+    "bitcoin", "btc", "xbt" -> "XBT"
+    "bitcoin cash", "bch" -> "BCH"
+    "ethereum", "eth" -> "ETH"
+    "litecoin", "ltc" -> "LTC"
+    "dogecoin", "doge" -> "DOGE"
+    "xrp" -> "XRP"
+    else -> null
+}
+
+@androidx.compose.runtime.Composable
+private fun LunoCard(
+    asset: String?,
+    address: String?,
+    isLoading: Boolean,
+    error: String?,
+    onLoad: () -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(18.dp)) {
+            Text("Luno payout address", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(asset?.let { "Asset: $it" } ?: "No compatible Luno asset detected", color = Color(0xFF6B7772), fontSize = 13.sp)
+            address?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Ink, fontSize = 13.sp)
+            }
+            error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Color(0xFFC45744), fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(10.dp))
+            Button(onClick = onLoad, enabled = asset != null && !isLoading, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint)) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                else Text(if (address == null) "Load address" else "Refresh address", fontWeight = FontWeight.Bold)
             }
         }
     }
