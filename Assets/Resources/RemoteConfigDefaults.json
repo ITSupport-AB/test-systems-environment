@@ -1,0 +1,17 @@
+{
+  "subscription_price_usd": 4.99,
+  "battlepass_price_usd": 9.99,
+  "ad_frequency_seconds": 30,
+  "battlepass_xp_multiplier": 1.0,
+  "vip_xp_multiplier": 1.5,
+  "xp_per_wave_base": 100,
+  "seasonal_event_enabled": false,
+  "seasonal_event_duration_hours": 72,
+  "seasonal_event_id": "none",
+  "seasonal_event_reward_id": "none",
+  "enemy_spawn_rate_base": 2.0,
+  "enemy_health_multiplier": 1.0,
+  "max_enemies_per_wave": 20,
+  "feature_new_ui_enabled": false,
+  "feature_battle_royale_enabled": false
+}

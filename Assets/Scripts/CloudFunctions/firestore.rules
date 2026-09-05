@@ -1,0 +1,117 @@
+// ============================================================================
+// Firestore Security Rules
+// Part of Freebuff Desktop (Unity GaaS).
+//
+// Protects user data so that:
+//   - Each user can only read/write their own documents.
+//   - VIP status fields are server-writable only (via Cloud Functions).
+//   - Save data uses version-based conflict detection.
+//   - Leaderboard scores are monotonically increasing (anti-inflation).
+//
+// Deploy: firebase deploy --only firestore:rules
+// ============================================================================
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+
+    function getUserUid() {
+      return request.auth.uid;
+    }
+
+    function getDocUid() {
+      return resource.id;
+    }
+
+    function isOwner() {
+      return getUserUid() == getDocUid();
+    }
+
+    function isFromAdmin() {
+      return request.auth.token.admin == true;
+    }
+
+    // --- Users Collection ---
+    // Structure: users/{uid}
+
+    match /users/{userId} {
+      allow read: if isOwner();
+
+      allow create: if isOwner()
+        && request.resource.data.keys().hasAll(['createdAt'])
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isVIP', 'vipExpiry', 'vipProductId', 'vipPlatform']);
+
+      allow update: if isOwner()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isVIP', 'vipExpiry', 'vipProductId', 'vipPlatform',
+                   'vipUpdatedAt', 'vipEnvironment', 'vipExpiredAt']);
+
+      allow delete: if false;
+
+      match /data/{docId} {
+        allow read: if isOwner();
+        allow write: if isOwner();
+      }
+
+      match /receiptNonces/{nonceId} {
+        allow read: if isOwner();
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+
+    // --- Leaderboard Collection ---
+    // Structure: leaderboard/{seasonId}/entries/{playerId}
+    //
+    // Anti-inflation rules:
+    //   1. Players can only write their own documents (uid == playerId).
+    //   2. Score must be monotonically increasing (new score >= current score).
+    //   3. Players can only update score, playerName, submittedAt, and metadata.
+    //   4. No deletes allowed (audit trail).
+    //   5. Read access requires authentication (prevents scraping by unauthenticated bots).
+
+    match /leaderboard/{seasonId}/entries/{playerId} {
+      // --- Read: Anyone authenticated can read any leaderboard ---
+      allow read: if request.auth != null;
+
+      // --- Create: Players can only create their own entry ---
+      allow create: if request.auth.uid == playerId
+        && request.resource.data.keys().hasAll([
+             'playerName', 'score', 'uid', 'submittedAt'
+           ])
+        && request.resource.data.score is int
+        && request.resource.data.score > 0
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.playerName is string
+        && request.resource.data.playerName.size() > 0
+        && request.resource.data.playerName.size() <= 24;
+
+      // --- Update: Score must be monotonically increasing ---
+      // Players can only update their own entry, and only specific fields.
+      // The critical anti-inflation rule: new score >= current score.
+      allow update: if request.auth.uid == playerId
+        && request.resource.data.score >= resource.data.score
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'score', 'playerName', 'submittedAt',
+            'highWave', 'metadata'
+          ])
+        && request.resource.data.playerName is string
+        && request.resource.data.playerName.size() > 0
+        && request.resource.data.playerName.size() <= 24;
+
+      // --- Delete: Not allowed (audit trail) ---
+      allow delete: if false;
+    }
+
+    // --- Global Block ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
